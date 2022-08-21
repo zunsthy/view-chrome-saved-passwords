@@ -13,17 +13,20 @@ namespace crypt {
   using v8::Uint8Array;
   using v8::Exception;
 
-  void SimpleCryptProtectData(const FunctionCallbackInfo<Value>& args) {
+  void LocalDeleter(void* data, size_t _length, void* _dData) {
+    LocalFree(data);
+  }
+
+  void CryptProtectOrUnprotectData(const FunctionCallbackInfo<Value>& args, boolean crypt) {
     Isolate* isolate = args.GetIsolate();
     if (!args[0]->IsUint8Array()) {
       isolate->ThrowException(
         Exception::TypeError(
           String::NewFromUtf8(isolate,
-            "CryptProtectData() need IsUint8Array as input").ToLocalChecked()));
+            "input must be \"Uint8Array\"").ToLocalChecked()));
       return;
     }
     Local<Uint8Array> input = Local<Uint8Array>::Cast(args[0]);
-
     DATA_BLOB dataIn;
     DATA_BLOB dataOut;
     DWORD cbDataIn = input->Length();
@@ -31,47 +34,30 @@ namespace crypt {
     input->CopyContents(pbDataIn, cbDataIn);
     dataIn.pbData = pbDataIn;
     dataIn.cbData = cbDataIn;
-    if (!CryptProtectData(&dataIn, NULL, NULL, NULL, NULL, 0, &dataOut)) {
-      isolate->ThrowError("CryptProtectData() encrypt error");
-      return;
+    if (crypt) {
+      if (!CryptProtectData(&dataIn, NULL, NULL, NULL, NULL, 0, &dataOut)) {
+        isolate->ThrowError("CryptProtectData() encrypt error");
+        return;
+      }
+    } else {
+      if (!CryptUnprotectData(&dataIn, NULL, NULL, NULL, NULL, 0, &dataOut)) {
+        isolate->ThrowError("CryptUnprotectData() decrypt error");
+        return;
+      }
     }
-
-    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, dataOut.cbData);
-    memcpy(ab->GetBackingStore()->Data(), dataOut.pbData, dataOut.cbData);
+    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate,
+      ArrayBuffer::NewBackingStore(dataOut.pbData, dataOut.cbData, LocalDeleter, NULL));
     Local<Uint8Array> out = Uint8Array::New(ab, 0, ab->ByteLength());
-    LocalFree(dataOut.pbData);
     delete pbDataIn;
     args.GetReturnValue().Set(out);
   }
 
-  void SimpleCryptUnprotectData(const FunctionCallbackInfo<Value>& args) {
-    Isolate* isolate = args.GetIsolate();
-    if (!args[0]->IsUint8Array()) {
-      isolate->ThrowException(
-        Exception::TypeError(
-          String::NewFromUtf8(isolate,
-            "CryptUnprotectData() need IsUint8Array as input").ToLocalChecked()));
-      return;
-    }
-    Local<Uint8Array> input = Local<Uint8Array>::Cast(args[0]);
-    DATA_BLOB dataIn;
-    DATA_BLOB dataOut;
-    DWORD cbDataIn = input->Length();
-    BYTE *pbDataIn = new BYTE[cbDataIn];
-    input->CopyContents(pbDataIn, cbDataIn);
-    dataIn.pbData = pbDataIn;
-    dataIn.cbData = cbDataIn;
-    if (!CryptUnprotectData(&dataIn, NULL, NULL, NULL, NULL, 0, &dataOut)) {
-      isolate->ThrowError("CryptUnprotectData() encrypt error");
-      return;
-    }
+  void SimpleCryptProtectData(const FunctionCallbackInfo<Value>& args) {
+    CryptProtectOrUnprotectData(args, true);
+  }
 
-    Local<ArrayBuffer> ab = ArrayBuffer::New(isolate, dataOut.cbData);
-    memcpy(ab->GetBackingStore()->Data(), dataOut.pbData, dataOut.cbData);
-    Local<Uint8Array> out = Uint8Array::New(ab, 0, ab->ByteLength());
-    LocalFree(dataOut.pbData);
-    delete pbDataIn;
-    args.GetReturnValue().Set(out);
+  void SimpleCryptUnprotectData(const FunctionCallbackInfo<Value>& args) {
+    CryptProtectOrUnprotectData(args, false);
   }
 
   void Initialize(Local<Object> exports) {
