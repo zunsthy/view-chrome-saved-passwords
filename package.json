@@ -1,0 +1,23 @@
+{
+  "name": "view-chrome-saved-passwords",
+  "private": true,
+  "version": "1.0.0",
+  "description": "list all chrome 70+ saved passwords",
+  "main": "index.js",
+  "engines": {
+    "node": ">= 18"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "test": "node test"
+  },
+  "author": {
+		"name": "zuns",
+		"email": "zunsthy@gmail.com"
+	},
+  "license": "MPL-2.0",
+  "dependencies": {
+    "node-gyp": "^9.0.0",
+    "sqlite3": "^5.0.0"
+  }
+}
