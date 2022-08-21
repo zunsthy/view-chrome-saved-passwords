@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const sqlite3 = require('sqlite3');
 const crypt = require('./build/Release/crypt');
+const { base64ToUint8Array } = require('./lib/utils');
 
 const TMP_FILENAME = 'data.tmp';
 
@@ -15,8 +16,8 @@ fs.readFile(stateFilePath, 'utf-8', (err, data) => {
 
   const state = JSON.parse(data);
   const keystr = state.os_crypt.encrypted_key;
-  const dpapiKey = Buffer.from(keystr, 'base64').subarray(5); // "DPAPI"
-  const key = crypt.CryptUnprotectData(dpapiKey.buffer);
+  const dpapiKey = base64ToUint8Array(keystr); // "DPAPI"
+  const key = crypt.CryptUnprotectData(dpapiKey.slice(5));
 
   fs.copyFile(loginDataFilePath, TMP_FILENAME, (err) => {
     if (err) throw err;
@@ -38,8 +39,11 @@ fs.readFile(stateFilePath, 'utf-8', (err, data) => {
         console.log(pageUrl, username, decrypted.toString('utf-8'));
       });
       // end
-      fs.unlink(TMP_FILENAME, () => {
-        console.log('');
+      setTimeout(() => {
+        db.close();
+        fs.unlink(TMP_FILENAME, (err) => {
+          if (err) throw err;
+        });
       });
     });
   });
