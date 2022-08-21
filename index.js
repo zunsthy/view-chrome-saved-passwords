@@ -14,8 +14,11 @@ fs.readFile(stateFilePath, 'utf-8', (err, data) => {
   if (err) throw err;
 
   const state = JSON.parse(data);
-  const keystr = state.os_crypt.encrypted_key;
-  const dpapiKey = Buffer.from(keystr, 'base64').subarray(5); // "DPAPI"
+  const keyBuffer = Buffer.from(state.os_crypt.encrypted_key, 'base64');
+  // trim "DPAPI" header
+  const dpapiKey = Buffer.alloc(keyBuffer.length - 5);
+  keyBuffer.copy(dpapiKey, 0, 5, keyBuffer.length);
+
   const key = crypt.CryptUnprotectData(dpapiKey.buffer);
 
   fs.copyFile(loginDataFilePath, TMP_FILENAME, (err) => {
